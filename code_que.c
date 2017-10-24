@@ -452,6 +452,7 @@ void
 loop() {
   // put your main code here, to run repeatedly:
   serialn("__loop_ ");
+  digitalWrite(ledPin, HIGH);
   if(button_state != 0){
     blink_led();
     serialn("__SOS_");
