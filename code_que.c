@@ -1,11 +1,9 @@
-#include <Arduino.h>        // Thư viện Arduino
-#include "SoftwareSerial.h" // Thư viện Uart phần mềm
+#include <Arduino.h>
+#include "SoftwareSerial.h"
 
-// Uart phần mềm của Arduino để liên kết với A7
-SoftwareSerial mySerial(10, 11); // RX là chân 10 của arduino,
-								 // TX là chân 11 của arduino
+SoftwareSerial mySerial(10, 11); // RX, TX 
 
-#define DEBUG 1 // Dùng để print debug (gỡ lỗi chương trình)
+#define DEBUG 1
 #ifdef DEBUG
 #define serial(msg)   Serial.print(msg)
 #define serialn(msg) Serial.println(msg)
@@ -14,103 +12,87 @@ SoftwareSerial mySerial(10, 11); // RX là chân 10 của arduino,
 #define serialn(msg)
 #endif  /* DEBUG 1 */
 
-const byte ledPin = 13; // ledPin là chân 13 của Arduino là led vàng.
-const byte my_led = 3; // ko quan tâm
+const byte ledPin = 13;
+const byte my_led = 3;
 
-const byte interruptPin = 2; // interruptPin là chân 2 là chân kết nối nút nhấn
-volatile byte button_state = 0; // biến trạng thái của button, = 1 là thực hiện SOS
-								//								= 0 là ko thực hiện SOS
+const byte interruptPin = 2;
+volatile byte button_state = 0;
 
-// Các define bên dưới để định nghĩa các kiểu trả về của các hàm								
 #define A7_OK         0
 #define A7_NOTOK      1
 #define A7_TIMEOUT    2
 #define A7_FAILURE    3
 
-// Các define bên dưới để định nghĩa thời gian chờ khi thực hiện lệnh
-// giao tiếp với module A7. Tính theo ms. Ví dụ: A7_CALL_TIMEOUT 70000
-// là thời thời chờ cuộc gọi trong 70s.
 #define A7_CMD_TIMEOUT   2000
+#define A7_AGPS_TIMEOUT  20000
 #define A7_SMS_TIMEOUT   5000
 #define A7_CALL_TIMEOUT 70000
 
-// Số lần lặp lại thực hiện lệnh thành công
 #define N_COMMON      1
+#define N_AGPS        2
 #define N_SPECIAL     5
 #define N_GPS         5
 
-// Số lần lặp lại thực hiện lệnh
 #define N_WAIT_GPS        1000
 #define N_WAIT_SMS        2
 
-// cấu trúc GPS_A7 gồm vĩ độ và kinh độ.
+
 struct GPS_A7 {
-    String latitude_str; 
+    String latitude_str;
     String longitude_str;
 }; 
 
 struct GPS_A7 GPS_data;
 
-// Cấu trúc SMSmessage
 struct SMSmessage {
     String number;
     String date;
     String message;
 };
 /* PHONE NUMBER */
-// Điền thêm các số điện tại đây
 String my_sim       = "01226779766";
 String my_mom       = "0903915863";
 String phone_num1   = "01269396359";
 String phone_num2   = "01646402358";
 String phone_num3   = "0902938745" ;
+String Khoa         = "01272701999";
 
 
-String link_maps; // chuỗi link google maps
+String link_maps;
 
-String inString = ""; 
+String inString = "";
 
 /* MY FUNCTION */
 
-void toggle_led(void ); // là hàm đảo trạng thái led vàng trên arduino
-void treo_sms(void);    // hàm gọi khi thiết bị bị treo, không đủ tiền thực hiện sms
-void treo_gps(void);    // hàm gọi khi ko thể bắt được dữ liệu GPS
+void toggle_led(void );
+void treo_sms(void);
+void treo_gps(void);
 
-void my_delay(unsigned long delay_in_ms); // Hàm tạo delay, khi đó chương trình ko thực hiện gì ngoài ngắt
-void blink_led(void); // chớp tắt led vàng
-
-// Những hàm chính trong setup
-int  my_set_up(void); // set up UART, tốc độ baud, gọi hàm set up board A7
-int  interrupt_set_up(void); //
-int  board_init(void); // set up board A7
-
-// Hàm phục vụ ngắt
+void my_delay(unsigned long delay_in_ms);
+void blink_led(void);
+int  my_set_up(void);
+int  interrupt_set_up(void);
+int  board_init(void);
 void button_interrupt(void);
-
-
 void treo(void);
 
-// Những hàm chính của GPS
-int gps_init(void); 	 // khởi tạo GPS và lấy dữ liệu GPS
-void gps_get_data(void); // phân tích gói tin GPS 
-void gps_done(void); 	 // tắt GPSRD
+int gps_init(void);
+void gps_get_data(void);
+void gps_done(void);
 
-// Những hàm chính của GSM
-// --- Gửi soạn tin nhắn
-void send_sos(void); // hàm gửi tin nhắn SOS
-void sms_init(void); // hàm khởi tạo tin nhắn.
-void send_sms_to(String number); // hàm soạn tin nhắn và gửi đến số diện thoại "number"
-// --- Gọi điện
-void call_sos(void); // hàm gọi điện thoại
-int dial(String number);  // hàm gọi số điện thoại "number"
+void send_sos(void);
+void sms_init(void);
+void send_sms_to(String number);
 
-// Hàm xử lý, giao tiếp với module A7
+void call_sos(void);
+int dial(String number); 
+
 int a7_command(const char *command, const char *expect_resp1, const char *expect_resp2, long TIMEOUT, int repetitions);
 int a7_call(const char *command, const char *expect_resp1, const char *expect_resp2, long TIMEOUT);
 int a7_wait(const char *expect_resp1, long TIMEOUT, int repetitions, int wait_times);
 /*****************************************************************/
 void 
-toggle_led(void ){ 
+toggle_led(void ){
   digitalWrite(ledPin, !digitalRead(ledPin));
 }
 void 
@@ -166,24 +148,11 @@ blink_led(void){
 int 
 my_set_up(void ) {
   serialn("__my_set_up_");
+  Serial.begin(57600);
+  mySerial.begin(57600);
   
-  // set tốc độ baud của UART phần cứng (Arduino <-> USB-UART <-> máy tính)
-  // Arduino <-> USB-UART
-  //     VCC <-> 5V  
-  //     GND <-> GND
-  //     TXD <-> RXD
-  //     RXD <-> TXD
-  Serial.begin(57600); 
-  
-  // set tốc độ baud của UART phần mềm (Arduino <-> A7)
-  // Arduino <-> A7
-  //     VCC <-> 5V  
-  //     GND <-> GND
-  //     11  <-> RXD
-  //     10  <-> TXD
-  mySerial.begin(57600); 
-  
-  // board_init() là hàm khởi động board A7
+  pinMode(my_led, OUTPUT);
+  digitalWrite(my_led, HIGH); 
   if (board_init() == A7_OK){
     return A7_OK;
   }
@@ -206,6 +175,8 @@ board_init(void) {
   a7_command("AT+GPSRD=0\r", "AT+GPSRD=0", "OK", A7_CMD_TIMEOUT, N_COMMON);
   serialn(inString);
   a7_command("AT+GPS=1\r", "AT+GPS=1", "OK", A7_CMD_TIMEOUT, N_COMMON);
+  serialn(inString);
+  a7_command("AT+AGPS=1\r", "AT+AGPS=1", "OK", A7_AGPS_TIMEOUT, N_AGPS);
   serialn(inString);
   a7_command("AT\r", "AT", "OK", A7_CMD_TIMEOUT, N_SPECIAL);
   serialn(inString);
@@ -269,8 +240,9 @@ void
 send_sos(void) {
    serialn("__send_sos_");
    sms_init();
-   send_sms_to(my_sim);
-   send_sms_to(my_mom);    
+   //send_sms_to(my_sim);
+   //send_sms_to(my_mom); 
+   send_sms_to(Khoa);   
 }
 /*****************************************************************/
 void 
@@ -299,8 +271,10 @@ send_sms_to(String number){
 void 
 call_sos(void){
   Serial.println("__call_sos_");
-  dial(my_sim);
-  dial(my_mom);
+  //dial(my_sim);
+  //dial(my_mom);
+  dial(Khoa);
+  //dial(Thuan);
   /* PHONE NUMBER */
   /*
 String my_sim       = "01226779766";
@@ -442,7 +416,7 @@ setup() {
   serial("\n\n --- PROJECT --- \n\n"); 
   my_set_up();
   interrupt_set_up();
-  //gps_init();
+  gps_init();
   blink_led();
   blink_led();
   blink_led();
@@ -451,8 +425,8 @@ setup() {
 void 
 loop() {
   // put your main code here, to run repeatedly:
-  serialn("__loop_ ");
   digitalWrite(ledPin, HIGH);
+  serialn("__loop_ ");
   if(button_state != 0){
     blink_led();
     serialn("__SOS_");
