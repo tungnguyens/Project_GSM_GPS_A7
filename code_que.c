@@ -1,9 +1,18 @@
 #include <Arduino.h>
 #include "SoftwareSerial.h"
 
+
+/* Khai báo Uart phần mềm:
+	Arduino <-> module A7
+		VCC <-> 5V
+		GND <-> GND
+		10  <-> UTXD
+		11  <-> URXD
+*/
 SoftwareSerial mySerial(10, 11); // RX, TX 
 
-#define DEBUG 1
+
+#define DEBUG 1 // in ra màn hình debug
 #ifdef DEBUG
 #define serial(msg)   Serial.print(msg)
 #define serialn(msg) Serial.println(msg)
@@ -12,27 +21,31 @@ SoftwareSerial mySerial(10, 11); // RX, TX
 #define serialn(msg)
 #endif  /* DEBUG 1 */
 
-const byte ledPin = 13;
-const byte my_led = 3;
+const byte ledPin = 13; // chân led vàng
+const byte my_led = 3;  // ko qtam
 
-const byte interruptPin = 2;
-volatile byte button_state = 0;
+const byte interruptPin = 2; // ngắt nút nhấn SOS ở chân số 2.
+volatile byte button_state = 0; // biến trạng thái nút nhấn
 
+// Các hằng số trả về của các hàm khi thao tác với A7
 #define A7_OK         0
 #define A7_NOTOK      1
 #define A7_TIMEOUT    2
 #define A7_FAILURE    3
 
+// Timeout chờ trả về khi thực hiện lệnh A7
 #define A7_CMD_TIMEOUT   2000
 #define A7_AGPS_TIMEOUT  20000
 #define A7_SMS_TIMEOUT   5000
 #define A7_CALL_TIMEOUT 70000
 
+// Số lần đúng mong muốn
 #define N_COMMON      1
 #define N_AGPS        2
 #define N_SPECIAL     5
 #define N_GPS         5
 
+// Số lần chờ
 #define N_WAIT_GPS        1000
 #define N_WAIT_SMS        2
 
@@ -49,7 +62,8 @@ struct SMSmessage {
     String date;
     String message;
 };
-/* PHONE NUMBER */
+/* PHONE NUMBER */ 
+// Thay đổi or thêm số điện thoại tại đây
 String my_sim       = "01226779766";
 String my_mom       = "0903915863";
 String phone_num1   = "01269396359";
@@ -64,31 +78,36 @@ String inString = "";
 
 /* MY FUNCTION */
 
-void toggle_led(void );
-void treo_sms(void);
-void treo_gps(void);
+void toggle_led(void ); // hàm đảo trạng thái led vàng (tắt thành bật, bật thành tắt)
+void treo_sms(void); // hàm gọi khi hết tiền, thiết bị treo, nháy led liên tục.
+void treo_gps(void); // hàm gọi khi ko bắt đc tín hiệu GPS, tắt 3s, nháy 1 giây
 
-void my_delay(unsigned long delay_in_ms);
-void blink_led(void);
-int  my_set_up(void);
-int  interrupt_set_up(void);
-int  board_init(void);
-void button_interrupt(void);
+void my_delay(unsigned long delay_in_ms); // hàm tạo độ trễ (ko quan tâm)
+void blink_led(void); // hàm nháy led vàng
+int  my_set_up(void); // Hàm cài đặt
+int  interrupt_set_up(void); // hàm cài đặt ngắt nút nhấn SOS
+int  board_init(void); // khởi tạo board A7
+void button_interrupt(void); // hàm gọi khi có nút nhấn
 void treo(void);
 
-int gps_init(void);
-void gps_get_data(void);
-void gps_done(void);
+int gps_init(void); // hàm lấy tín hiệu GPS
+void gps_get_data(void); // hàm xử lý gói tin GPS lấy kinh độ vĩ độ
+void gps_done(void); // hàm thực hiện đóng GPS
 
-void send_sos(void);
-void sms_init(void);
-void send_sms_to(String number);
+void send_sos(void); // hàm gửi tin nhắn SOS
+void sms_init(void); // khởi tạo tin nhắn dạng chuỗi ASCII
+void send_sms_to(String number); // hàm soạn và gửi tin nhắn tới số number
 
-void call_sos(void);
-int dial(String number); 
+void call_sos(void); // hàm gọi điện
+int dial(String number);  // hàm gọi đt tới số number
 
+// hàm thực hiện truyền lệnh cho A7
 int a7_command(const char *command, const char *expect_resp1, const char *expect_resp2, long TIMEOUT, int repetitions);
+
+// hàm chờ gọi đt
 int a7_call(const char *command, const char *expect_resp1, const char *expect_resp2, long TIMEOUT);
+
+// hàm chờ tin từ A7
 int a7_wait(const char *expect_resp1, long TIMEOUT, int repetitions, int wait_times);
 /*****************************************************************/
 void 
